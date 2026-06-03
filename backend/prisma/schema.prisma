@@ -1,0 +1,110 @@
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("HR") // "HR" or "ADMIN"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Job {
+  id          String       @id @default(uuid())
+  title       String
+  description String
+  status      String       @default("ACTIVE") // "ACTIVE" or "INACTIVE"
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  assessments Assessment[]
+}
+
+model Assessment {
+  id           String     @id @default(uuid())
+  jobId        String
+  title        String
+  description  String
+  duration     Int        // In minutes
+  passingScore Int        // e.g., 60
+  status       String     @default("ACTIVE") // "ACTIVE" or "INACTIVE"
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+  job          Job        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  questions    Question[]
+  attempts     Attempt[]
+}
+
+model Question {
+  id           String     @id @default(uuid())
+  assessmentId String
+  questionText String
+  questionType String     // "MULTIPLE_CHOICE", "MULTIPLE_CORRECT", "TRUE_FALSE", "TEXT"
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  options      Option[]
+  answers      Answer[]
+}
+
+model Option {
+  id           String   @id @default(uuid())
+  questionId   String
+  optionText   String
+  isCorrect    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  question     Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers      Answer[]
+}
+
+model Candidate {
+  id              String    @id @default(uuid())
+  fullName        String
+  email           String
+  phone           String
+  city            String
+  experienceYears Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  attempts        Attempt[]
+}
+
+model Attempt {
+  id           String     @id @default(uuid())
+  candidateId  String
+  assessmentId String
+  startedAt    DateTime   @default(now())
+  submittedAt  DateTime?
+  score        Float      @default(0)
+  percentage   Float      @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  candidate    Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  answers      Answer[]
+}
+
+model Answer {
+  id               String    @id @default(uuid())
+  attemptId        String
+  questionId       String
+  selectedOptionId String?
+  textAnswer       String?   // For text-based or code questions
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  attempt          Attempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question         Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOption   Option?   @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+}
