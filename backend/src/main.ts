@@ -2,9 +2,16 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const origin = req.headers.origin ? String(req.headers.origin) : '';
+    console.log(`[Incoming Request] ${req.method} ${req.url} - Origin: ${origin}`);
+    next();
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
