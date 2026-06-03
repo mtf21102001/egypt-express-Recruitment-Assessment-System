@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import express from 'express';
+import express, { Request, Response } from 'express';
 
 const server = express();
 
@@ -26,7 +26,7 @@ export const bootstrap = async (expressInstance: express.Express) => {
 
 let isCached = false;
 
-export default async (req: any, res: any) => {
+export default async (req: Request, res: Response) => {
   if (!isCached) {
     await bootstrap(server);
     isCached = true;
