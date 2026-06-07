@@ -49,13 +49,10 @@ body {
 .glass-card {
   background: var(--card-bg);
   backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
   border: 1px solid var(--card-border);
   border-radius: 16px;
   box-shadow: var(--glass-shadow);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
-  backdrop-filter: brightness(0);
-  color: white;
 }
 
 .glass-card:hover {
@@ -217,4 +214,8 @@ body {
 
 .text-muted {
   color: var(--text-muted) !important;
+}
+
+.text-main {
+  color: var(--text-main) !important;
 }
