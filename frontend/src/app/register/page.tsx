@@ -43,7 +43,7 @@ export default function RegisterPage() {
     try {
       await api.auth.register({ name, email, password });
       // Redirect to login on success
-      router.push('/login?registered=true');
+      router.push('');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed. Try again.';
       setError(message);

@@ -39,9 +39,6 @@ export default function LandingPage() {
               Get Started as HR
               <i className="bi bi-arrow-right"></i>
             </Link>
-            <Link href="/register" className="btn btn-outline-secondary border-opacity-25 px-4 py-2.5 rounded-3 fw-semibold">
-              Create Free Account
-            </Link>
           </div>
         </div>
 
@@ -57,7 +54,7 @@ export default function LandingPage() {
 
             <div className="bg-light bg-opacity-5 p-3 rounded-3 small text-muted border border-black border-opacity-5">
               <div className="fw-bold mb-1"><i className="bi bi-info-circle-fill text-primary me-2"></i>Link Format:</div>
-              <code className="text-primary font-monospace">http://localhost:3001/assessments/9d440e93-32bb-0bd8ecc2ae22</code>
+              <code className="text-primary font-monospace">https://egypt-express-recruitment-assessment.netlify.app/assessments/9d440e93-32bb-0bd8ecc2ae22</code>
             </div>
           </div>
         </div>

@@ -48,11 +48,11 @@ function LoginForm() {
     setLoading(true);
     try {
       const response = await api.auth.login({ email, password });
-      
+
       // Save token and user details to cookies
       cookies.set('token', response.access_token, 7);
       cookies.set('user', JSON.stringify(response.user), 7);
-      
+
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (err: unknown) {
@@ -148,13 +148,6 @@ function LoginForm() {
                 )}
               </button>
             </form>
-
-            <div className="text-center mt-4">
-              <span className="text-muted small">Don&apos;t have an account? </span>
-              <Link href="/register" className="text-primary small fw-semibold text-decoration-none">
-                Register Now
-              </Link>
-            </div>
           </div>
         </div>
       </div>
