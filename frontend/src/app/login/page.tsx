@@ -148,6 +148,13 @@ function LoginForm() {
                 )}
               </button>
             </form>
+
+            <div className="text-center mt-4">
+              <span className="text-muted small">Don&apos;t have an account? </span>
+              <Link href="/register" className="text-primary small fw-semibold text-decoration-none">
+                Register Now
+              </Link>
+            </div>
           </div>
         </div>
       </div>
