@@ -147,13 +147,24 @@ export default function BatchAssessmentsModal({
       ['DevOps Specialist', 'AWS Cloud Infrastructure Test', 'Test covering AWS IAM, VPC, and ECS deployment.', '45', '70', 'ACTIVE'],
       ['QA Automation Engineer', 'Playwright automation basics', 'Basic test for locator strategies and page object models.', '30', '65', 'ACTIVE']
     ];
+
+    const escapeCSV = (val: string) => {
+      if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
     
-    const content = [headers.join('\t'), ...sampleRows.map(r => r.join('\t'))].join('\n');
-    const blob = new Blob([content], { type: 'text/tab-separated-values;charset=utf-8;' });
+    const content = [
+      headers.map(escapeCSV).join(','),
+      ...sampleRows.map(r => r.map(escapeCSV).join(','))
+    ].join('\n');
+
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'assessments_template.tsv';
+    link.download = 'assessments_template.csv';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -198,7 +209,7 @@ export default function BatchAssessmentsModal({
                     onClick={downloadTemplate}
                   >
                     <i className="bi bi-file-earmark-arrow-down-fill"></i>
-                    Download Excel Template (.tsv)
+                    Download Excel Template (.csv)
                   </button>
                   <textarea
                     className="form-control bg-light bg-opacity-5 text-main"
