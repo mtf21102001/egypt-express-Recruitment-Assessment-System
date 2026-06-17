@@ -63,13 +63,18 @@ export default function BatchQuestionsModal({
       if (isValid) {
         if (questionType === 'TRUE_FALSE') {
           const correctVal = (cols[6] || '').toLowerCase();
-          const isTrueCorrect = correctVal === 'true' || correctVal === '0' || correctVal === 't';
-          optionsList.push({ optionText: 'True', isCorrect: isTrueCorrect });
-          optionsList.push({ optionText: 'False', isCorrect: !isTrueCorrect });
+          const isTrue = ['true', '0', 't', 'yes', 'y'].includes(correctVal);
+          const isFalse = ['false', '1', 'f', 'no', 'n'].includes(correctVal);
           
           if (!correctVal) {
             isValid = false;
             valError = 'True/False requires correct answer in Col G (true/false or 0/1).';
+          } else if (!isTrue && !isFalse) {
+            isValid = false;
+            valError = 'Col G must be a valid True/False indicator (e.g. true/false or 0/1).';
+          } else {
+            optionsList.push({ optionText: 'True', isCorrect: isTrue });
+            optionsList.push({ optionText: 'False', isCorrect: isFalse });
           }
         } else if (questionType !== 'TEXT') {
           // Options columns: 2, 3, 4, 5 (Option 1, 2, 3, 4)
@@ -231,8 +236,19 @@ export default function BatchQuestionsModal({
                             
                             {/* Options 1 to 4 */}
                             {[0, 1, 2, 3].map((optIdx) => {
-                              const optText = q.rawCols[optIdx + 2];
-                              const isCorrect = q.options[optIdx]?.isCorrect || false;
+                              let optText = q.rawCols[optIdx + 2];
+                              let isCorrect = q.options[optIdx]?.isCorrect || false;
+                              
+                              if (q.questionType === 'TRUE_FALSE') {
+                                if (optIdx === 0) {
+                                  optText = 'True';
+                                } else if (optIdx === 1) {
+                                  optText = 'False';
+                                } else {
+                                  optText = '';
+                                }
+                              }
+
                               const isRequiredMissing = optIdx < 2 && !optText && q.questionType !== 'TEXT';
                               return (
                                 <td 
