@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { api, Job } from '../../../utils/api';
+import BatchJobsModal from '../../../components/BatchJobsModal';
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -10,6 +11,7 @@ export default function JobsPage() {
   
   // Modal & form states
   const [showModal, setShowModal] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -112,10 +114,16 @@ export default function JobsPage() {
           <h3 className="fw-bold mb-1">Job Openings</h3>
           <p className="text-muted small mb-0">Create and manage your open positions for assessment targeting</p>
         </div>
-        <button className="btn gradient-btn d-flex align-items-center gap-2" onClick={handleOpenCreate}>
-          <i className="bi bi-plus-lg"></i>
-          Create Job
-        </button>
+        <div className="d-flex gap-2">
+          <button className="btn btn-outline-primary border-opacity-25 d-flex align-items-center gap-2" onClick={() => setShowBatchModal(true)}>
+            <i className="bi bi-clipboard-data"></i>
+            Batch Import
+          </button>
+          <button className="btn gradient-btn d-flex align-items-center gap-2" onClick={handleOpenCreate}>
+            <i className="bi bi-plus-lg"></i>
+            Create Job
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -177,6 +185,13 @@ export default function JobsPage() {
       {showModal && (
         <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
       )}
+
+      {/* Batch Import Modal */}
+      <BatchJobsModal
+        isOpen={showBatchModal}
+        onClose={() => setShowBatchModal(false)}
+        onSuccess={fetchJobs}
+      />
       
       <div className={`modal fade ${showModal ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1050, display: showModal ? 'block' : 'none' }}>
         <div className="modal-dialog modal-dialog-centered">

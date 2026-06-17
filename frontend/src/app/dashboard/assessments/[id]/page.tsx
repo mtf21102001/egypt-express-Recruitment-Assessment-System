@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api, Assessment, Question } from '../../../../utils/api';
+import BatchQuestionsModal from '../../../../components/BatchQuestionsModal';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -22,6 +23,7 @@ export default function AssessmentDetailPage({ params }: PageProps) {
 
   // Modal & form states
   const [showModal, setShowModal] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [questionText, setQuestionText] = useState('');
   const [questionType, setQuestionType] = useState('MULTIPLE_CHOICE');
@@ -224,10 +226,16 @@ export default function AssessmentDetailPage({ params }: PageProps) {
             <h3 className="fw-bold mb-1">{assessment.title}</h3>
             <p className="text-muted small mb-0">{assessment.description}</p>
           </div>
-          <button className="btn gradient-btn d-flex align-items-center gap-2" onClick={handleOpenCreate}>
-            <i className="bi bi-plus-lg"></i>
-            Add Question
-          </button>
+          <div className="d-flex gap-2">
+            <button className="btn btn-outline-primary border-opacity-25 d-flex align-items-center gap-2" onClick={() => setShowBatchModal(true)}>
+              <i className="bi bi-clipboard-data"></i>
+              Batch Import
+            </button>
+            <button className="btn gradient-btn d-flex align-items-center gap-2" onClick={handleOpenCreate}>
+              <i className="bi bi-plus-lg"></i>
+              Add Question
+            </button>
+          </div>
         </div>
       </div>
 
@@ -307,6 +315,14 @@ export default function AssessmentDetailPage({ params }: PageProps) {
       {showModal && (
         <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
       )}
+
+      {/* Batch Import Modal */}
+      <BatchQuestionsModal
+        isOpen={showBatchModal}
+        onClose={() => setShowBatchModal(false)}
+        assessmentId={assessmentId || ''}
+        onSuccess={() => assessmentId && fetchData(assessmentId)}
+      />
 
       <div className={`modal fade ${showModal ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1050, display: showModal ? 'block' : 'none' }}>
         <div className="modal-dialog modal-dialog-centered modal-lg">

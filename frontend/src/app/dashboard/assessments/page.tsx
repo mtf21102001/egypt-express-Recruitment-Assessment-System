@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api, Assessment, Job } from '../../../utils/api';
+import BatchAssessmentsModal from '../../../components/BatchAssessmentsModal';
 
 export default function AssessmentsPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
@@ -12,6 +13,7 @@ export default function AssessmentsPage() {
 
   // Modal & form states
   const [showModal, setShowModal] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
   const [editingAssessment, setEditingAssessment] = useState<Assessment | null>(null);
   const [formData, setFormData] = useState({
     jobId: '',
@@ -142,10 +144,16 @@ export default function AssessmentsPage() {
           <h3 className="fw-bold mb-1">Assessments</h3>
           <p className="text-muted small mb-0">Design entry exams, configure timers, and build question papers</p>
         </div>
-        <button className="btn gradient-btn d-flex align-items-center gap-2" onClick={handleOpenCreate}>
-          <i className="bi bi-plus-lg"></i>
-          Create Assessment
-        </button>
+        <div className="d-flex gap-2">
+          <button className="btn btn-outline-primary border-opacity-25 d-flex align-items-center gap-2" onClick={() => setShowBatchModal(true)}>
+            <i className="bi bi-clipboard-data"></i>
+            Batch Import
+          </button>
+          <button className="btn gradient-btn d-flex align-items-center gap-2" onClick={handleOpenCreate}>
+            <i className="bi bi-plus-lg"></i>
+            Create Assessment
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -235,6 +243,14 @@ export default function AssessmentsPage() {
       {showModal && (
         <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
       )}
+
+      {/* Batch Import Modal */}
+      <BatchAssessmentsModal
+        isOpen={showBatchModal}
+        onClose={() => setShowBatchModal(false)}
+        onSuccess={fetchData}
+        jobs={jobs}
+      />
       
       <div className={`modal fade ${showModal ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1050, display: showModal ? 'block' : 'none' }}>
         <div className="modal-dialog modal-dialog-centered">
