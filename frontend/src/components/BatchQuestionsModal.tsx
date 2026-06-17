@@ -63,15 +63,15 @@ export default function BatchQuestionsModal({
       if (isValid) {
         if (questionType === 'TRUE_FALSE') {
           const correctVal = (cols[6] || '').toLowerCase();
-          const isTrue = ['true', '0', 't', 'yes', 'y'].includes(correctVal);
-          const isFalse = ['false', '1', 'f', 'no', 'n'].includes(correctVal);
+          const isTrue = ['true', '1', 't', 'yes', 'y'].includes(correctVal);
+          const isFalse = ['false', '2', 'f', 'no', 'n'].includes(correctVal);
           
           if (!correctVal) {
             isValid = false;
-            valError = 'True/False requires correct answer in Col G (true/false or 0/1).';
+            valError = 'True/False requires correct answer in Col G (1 for True, 2 for False).';
           } else if (!isTrue && !isFalse) {
             isValid = false;
-            valError = 'Col G must be a valid True/False indicator (e.g. true/false or 0/1).';
+            valError = 'Col G must be 1 (True) or 2 (False).';
           } else {
             optionsList.push({ optionText: 'True', isCorrect: isTrue });
             optionsList.push({ optionText: 'False', isCorrect: isFalse });
@@ -87,16 +87,16 @@ export default function BatchQuestionsModal({
             valError = 'Multiple choice must have at least 2 choices (Cols C & D).';
           }
 
-          // Correct indexes from column 6
+          // Correct indexes from column 6 (1-based, so we subtract 1)
           const correctVal = cols[6] || '';
           const correctIndexes = correctVal
             .split(',')
-            .map((idx) => parseInt(idx.trim(), 10))
+            .map((idx) => parseInt(idx.trim(), 10) - 1)
             .filter((idx) => !isNaN(idx));
 
           if (correctIndexes.length === 0) {
             isValid = false;
-            valError = 'Specify correct option index in Col G (e.g. 0, or 0,1).';
+            valError = 'Specify correct option index in Col G (e.g. 1, or 1,3).';
           }
 
           optTexts.forEach((text, index) => {
@@ -147,6 +147,34 @@ export default function BatchQuestionsModal({
     }
   };
 
+  const downloadTemplate = () => {
+    const headers = [
+      'Question Text',
+      'Question Type',
+      'Option 1',
+      'Option 2',
+      'Option 3',
+      'Option 4',
+      'Correct Index'
+    ];
+    const sampleRows = [
+      ['What is the capital of Egypt?', 'MULTIPLE_CHOICE', 'Cairo', 'Alexandria', 'Giza', 'Luxor', '1'],
+      ['Select the odd numbers.', 'MULTIPLE_CORRECT', '1', '2', '3', '8', '1,3'],
+      ['TypeScript is a compiled language.', 'TRUE_FALSE', '', '', '', '', '1'],
+      ['Explain the difference between SQL and NoSQL.', 'TEXT', '', '', '', '', '']
+    ];
+    
+    const content = [headers.join('\t'), ...sampleRows.map(r => r.join('\t'))].join('\n');
+    const blob = new Blob([content], { type: 'text/tab-separated-values;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'questions_template.tsv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <>
       <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
@@ -180,6 +208,14 @@ export default function BatchQuestionsModal({
                     Copy columns in Excel matching this format: <br />
                     <code>[Col A: Question Text] | [Col B: Type] | [Col C: Opt1] | [Col D: Opt2] | [Col E: Opt3] | [Col F: Opt4] | [Col G: Correct Index(es)]</code>
                   </p>
+                  <button 
+                    type="button" 
+                    className="btn btn-sm btn-link text-decoration-none fw-semibold mb-4 d-inline-flex align-items-center gap-1"
+                    onClick={downloadTemplate}
+                  >
+                    <i className="bi bi-file-earmark-arrow-down-fill"></i>
+                    Download Excel Template (.tsv)
+                  </button>
                   <textarea
                     className="form-control bg-light bg-opacity-5 text-main"
                     rows={6}

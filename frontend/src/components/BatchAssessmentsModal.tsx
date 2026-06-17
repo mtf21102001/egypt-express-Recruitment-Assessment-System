@@ -134,6 +134,31 @@ export default function BatchAssessmentsModal({
     }
   };
 
+  const downloadTemplate = () => {
+    const headers = [
+      'Job Title',
+      'Assessment Title',
+      'Description / Instructions',
+      'Duration (Mins)',
+      'Passing Score (%)',
+      'Status (ACTIVE/INACTIVE)'
+    ];
+    const sampleRows = [
+      ['DevOps Specialist', 'AWS Cloud Infrastructure Test', 'Test covering AWS IAM, VPC, and ECS deployment.', '45', '70', 'ACTIVE'],
+      ['QA Automation Engineer', 'Playwright automation basics', 'Basic test for locator strategies and page object models.', '30', '65', 'ACTIVE']
+    ];
+    
+    const content = [headers.join('\t'), ...sampleRows.map(r => r.join('\t'))].join('\n');
+    const blob = new Blob([content], { type: 'text/tab-separated-values;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'assessments_template.tsv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <>
       <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
@@ -167,6 +192,14 @@ export default function BatchAssessmentsModal({
                     Copy columns in Excel matching this format: <br />
                     <code>[Col A: Job Title] | [Col B: Assessment Title] | [Col C: Description] | [Col D: Duration (Mins)] | [Col E: Passing Score (%)] | [Col F: Status]</code>
                   </p>
+                  <button 
+                    type="button" 
+                    className="btn btn-sm btn-link text-decoration-none fw-semibold mb-4 d-inline-flex align-items-center gap-1"
+                    onClick={downloadTemplate}
+                  >
+                    <i className="bi bi-file-earmark-arrow-down-fill"></i>
+                    Download Excel Template (.tsv)
+                  </button>
                   <textarea
                     className="form-control bg-light bg-opacity-5 text-main"
                     rows={6}

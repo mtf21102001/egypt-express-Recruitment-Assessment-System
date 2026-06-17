@@ -98,6 +98,25 @@ export default function BatchJobsModal({
     }
   };
 
+  const downloadTemplate = () => {
+    const headers = ['Job Title', 'Job Description', 'Status (ACTIVE/INACTIVE)'];
+    const sampleRows = [
+      ['DevOps Specialist', 'Manage AWS cloud services and establish secure CI/CD pipelines.', 'ACTIVE'],
+      ['QA Automation Engineer', 'Build robust end-to-end browser automation suites using Playwright.', 'ACTIVE'],
+      ['HR Specialist', 'Coordinate recruitment cycles and manage candidate communication.', 'INACTIVE']
+    ];
+    
+    const content = [headers.join('\t'), ...sampleRows.map(r => r.join('\t'))].join('\n');
+    const blob = new Blob([content], { type: 'text/tab-separated-values;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'jobs_template.tsv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <>
       <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
@@ -131,6 +150,14 @@ export default function BatchJobsModal({
                     Copy columns in Excel matching this format: <br />
                     <code>[Col A: Job Title] | [Col B: Job Description] | [Col C: Status (ACTIVE/INACTIVE)]</code>
                   </p>
+                  <button 
+                    type="button" 
+                    className="btn btn-sm btn-link text-decoration-none fw-semibold mb-4 d-inline-flex align-items-center gap-1"
+                    onClick={downloadTemplate}
+                  >
+                    <i className="bi bi-file-earmark-arrow-down-fill"></i>
+                    Download Excel Template (.tsv)
+                  </button>
                   <textarea
                     className="form-control bg-light bg-opacity-5 text-main"
                     rows={6}
