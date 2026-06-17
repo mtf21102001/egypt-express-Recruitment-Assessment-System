@@ -11,9 +11,12 @@ interface BatchQuestionsModalProps {
 }
 
 interface ParsedQuestion {
+  rawCols: string[];
   questionText: string;
   questionType: string;
   options: Array<{ optionText: string; isCorrect: boolean }>;
+  isValid: boolean;
+  error?: string;
 }
 
 export default function BatchQuestionsModal({
@@ -38,42 +41,75 @@ export default function BatchQuestionsModal({
     const newQuestions: ParsedQuestion[] = [];
 
     for (let i = 0; i < rows.length; i++) {
-      const cols = rows[i].split('\t');
-      if (cols.length < 2) continue; // Must have at least Question Text and Type
+      const cols = rows[i].split('\t').map(c => c.trim());
+      const rawCols = [...cols];
 
-      const questionText = cols[0].trim();
-      const questionType = cols[1].trim().toUpperCase(); // MULTIPLE_CHOICE, MULTIPLE_CORRECT, TRUE_FALSE, TEXT
+      const questionText = cols[0] || '';
+      const questionType = (cols[1] || '').toUpperCase(); // MULTIPLE_CHOICE, MULTIPLE_CORRECT, TRUE_FALSE, TEXT
+
+      let isValid = true;
+      let valError = '';
+
+      if (!questionText) {
+        isValid = false;
+        valError = 'Missing question text.';
+      } else if (!['MULTIPLE_CHOICE', 'MULTIPLE_CORRECT', 'TRUE_FALSE', 'TEXT'].includes(questionType)) {
+        isValid = false;
+        valError = 'Invalid type. Use MULTIPLE_CHOICE, MULTIPLE_CORRECT, TRUE_FALSE, or TEXT.';
+      }
 
       const optionsList: Array<{ optionText: string; isCorrect: boolean }> = [];
 
-      if (questionType === 'TRUE_FALSE') {
-        const correctVal = (cols[6] || '').trim().toLowerCase();
-        optionsList.push({ optionText: 'True', isCorrect: correctVal === 'true' || correctVal === '0' });
-        optionsList.push({ optionText: 'False', isCorrect: correctVal === 'false' || correctVal === '1' });
-      } else if (questionType !== 'TEXT') {
-        // Options columns: 2, 3, 4, 5 (Option 1, 2, 3, 4)
-        const optTexts = [cols[2], cols[3], cols[4], cols[5]].filter(
-          (val) => val !== undefined && val.trim() !== ''
-        );
+      if (isValid) {
+        if (questionType === 'TRUE_FALSE') {
+          const correctVal = (cols[6] || '').toLowerCase();
+          const isTrueCorrect = correctVal === 'true' || correctVal === '0' || correctVal === 't';
+          optionsList.push({ optionText: 'True', isCorrect: isTrueCorrect });
+          optionsList.push({ optionText: 'False', isCorrect: !isTrueCorrect });
+          
+          if (!correctVal) {
+            isValid = false;
+            valError = 'True/False requires correct answer in Col G (true/false or 0/1).';
+          }
+        } else if (questionType !== 'TEXT') {
+          // Options columns: 2, 3, 4, 5 (Option 1, 2, 3, 4)
+          const optTexts = [cols[2], cols[3], cols[4], cols[5]].filter(
+            (val) => val !== undefined && val !== ''
+          );
 
-        // Correct indexes from column 6
-        const correctIndexes = (cols[6] || '')
-          .split(',')
-          .map((idx) => parseInt(idx.trim(), 10))
-          .filter((idx) => !isNaN(idx));
+          if (optTexts.length < 2) {
+            isValid = false;
+            valError = 'Multiple choice must have at least 2 choices (Cols C & D).';
+          }
 
-        optTexts.forEach((text, index) => {
-          optionsList.push({
-            optionText: text.trim(),
-            isCorrect: correctIndexes.includes(index),
+          // Correct indexes from column 6
+          const correctVal = cols[6] || '';
+          const correctIndexes = correctVal
+            .split(',')
+            .map((idx) => parseInt(idx.trim(), 10))
+            .filter((idx) => !isNaN(idx));
+
+          if (correctIndexes.length === 0) {
+            isValid = false;
+            valError = 'Specify correct option index in Col G (e.g. 0, or 0,1).';
+          }
+
+          optTexts.forEach((text, index) => {
+            optionsList.push({
+              optionText: text,
+              isCorrect: correctIndexes.includes(index),
+            });
           });
-        });
+        }
       }
 
       newQuestions.push({
+        rawCols,
         questionText,
         questionType,
         options: optionsList,
+        isValid,
+        error: valError,
       });
     }
 
@@ -81,13 +117,13 @@ export default function BatchQuestionsModal({
   };
 
   const handleSaveAll = async () => {
-    if (parsedQuestions.length === 0) return;
+    const validQuestions = parsedQuestions.filter((q) => q.isValid);
+    if (validQuestions.length === 0) return;
     setLoading(true);
     setError('');
 
     try {
-      // Send sequential requests to avoid DB locking and keep API lightweight
-      for (const q of parsedQuestions) {
+      for (const q of validQuestions) {
         await api.questions.create({
           assessmentId,
           questionText: q.questionText,
@@ -110,7 +146,7 @@ export default function BatchQuestionsModal({
     <>
       <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
       <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
-        <div className="modal-dialog modal-dialog-centered modal-xl">
+        <div className="modal-dialog modal-dialog-centered modal-xl" style={{ maxWidth: '90%' }}>
           <div className="modal-content glass-card border-0 p-4 animate-slide-up" style={{ background: 'var(--card-bg)' }}>
             <div className="modal-header border-0 pb-0">
               <h5 className="modal-title fw-bold">Batch Import Questions</h5>
@@ -137,7 +173,7 @@ export default function BatchQuestionsModal({
                   <h6 className="fw-semibold">Paste Excel Columns Here</h6>
                   <p className="text-muted small mb-4">
                     Copy columns in Excel matching this format: <br />
-                    <code>[Question Text] | [Type] | [Opt1] | [Opt2] | [Opt3] | [Opt4] | [Correct Index(es)]</code>
+                    <code>[Col A: Question Text] | [Col B: Type] | [Col C: Opt1] | [Col D: Opt2] | [Col E: Opt3] | [Col F: Opt4] | [Col G: Correct Index(es)]</code>
                   </p>
                   <textarea
                     className="form-control bg-light bg-opacity-5 text-main"
@@ -152,7 +188,7 @@ export default function BatchQuestionsModal({
                 <div>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <span className="text-muted small">
-                      Parsed <strong>{parsedQuestions.length}</strong> questions. Verify below before saving.
+                      Parsed <strong>{parsedQuestions.length}</strong> questions. Only valid rows (marked in green) will be imported.
                     </span>
                     <button
                       className="btn btn-sm btn-outline-danger border-opacity-25"
@@ -163,40 +199,71 @@ export default function BatchQuestionsModal({
                     </button>
                   </div>
 
-                  <div className="table-responsive" style={{ maxHeight: '400px' }}>
-                    <table className="table custom-table mb-0 align-middle small">
-                      <thead>
+                  <div className="table-responsive" style={{ maxHeight: '450px' }}>
+                    <table className="table table-bordered custom-table mb-0 align-middle small text-light" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                      <thead className="bg-dark bg-opacity-50">
                         <tr>
-                          <th>Question</th>
-                          <th>Type</th>
-                          <th>Options / Correct Answer</th>
+                          <th style={{ width: '50px' }}>#</th>
+                          <th>Col A: Question Text</th>
+                          <th style={{ width: '150px' }}>Col B: Type</th>
+                          <th>Col C: Option 1</th>
+                          <th>Col D: Option 2</th>
+                          <th>Col E: Option 3</th>
+                          <th>Col F: Option 4</th>
+                          <th style={{ width: '120px' }}>Col G: Correct Index</th>
+                          <th style={{ width: '150px' }}>Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {parsedQuestions.map((q, idx) => (
-                          <tr key={idx}>
-                            <td className="fw-semibold text-main">{q.questionText}</td>
-                            <td>
-                              <span className="badge bg-light text-dark">{q.questionType}</span>
+                          <tr key={idx} className={q.isValid ? '' : 'table-danger bg-danger bg-opacity-5'}>
+                            <td className="font-monospace text-muted text-center">{idx + 1}</td>
+                            <td className={!q.questionText ? 'bg-danger bg-opacity-10 text-danger' : ''}>
+                              {q.questionText || <span className="text-danger small italic">Missing Question</span>}
                             </td>
-                            <td>
-                              {q.questionType === 'TEXT' ? (
-                                <span className="text-muted italic">Text Answer</span>
+                            <td className={!q.questionType ? 'bg-danger bg-opacity-10 text-danger' : ''}>
+                              {q.questionType ? (
+                                <span className="badge bg-light text-dark">{q.questionType}</span>
                               ) : (
-                                <div className="d-flex flex-wrap gap-2">
-                                  {q.options.map((opt, oIdx) => (
-                                    <span
-                                      key={oIdx}
-                                      className={`badge ${
-                                        opt.isCorrect
-                                          ? 'bg-success text-white'
-                                          : 'bg-light text-muted'
-                                      }`}
-                                    >
-                                      {opt.optionText}
+                                <span className="text-danger small italic">Missing</span>
+                              )}
+                            </td>
+                            
+                            {/* Options 1 to 4 */}
+                            {[0, 1, 2, 3].map((optIdx) => {
+                              const optText = q.rawCols[optIdx + 2];
+                              const isCorrect = q.options[optIdx]?.isCorrect || false;
+                              const isRequiredMissing = optIdx < 2 && !optText && q.questionType !== 'TEXT';
+                              return (
+                                <td 
+                                  key={optIdx} 
+                                  className={isRequiredMissing ? 'bg-danger bg-opacity-10 text-danger text-center' : ''}
+                                >
+                                  {optText ? (
+                                    <span className={isCorrect ? 'text-success fw-semibold' : ''}>
+                                      {isCorrect && <i className="bi bi-check-circle-fill me-1"></i>}
+                                      {optText}
                                     </span>
-                                  ))}
-                                </div>
+                                  ) : (
+                                    isRequiredMissing ? <span className="text-danger small italic">Required</span> : <span className="text-muted opacity-30">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+
+                            {/* Correct Index */}
+                            <td className={q.questionType !== 'TEXT' && !q.rawCols[6] ? 'bg-danger bg-opacity-10 text-danger text-center' : 'text-center'}>
+                              {q.rawCols[6] || (q.questionType === 'TEXT' ? <span className="text-muted opacity-30">-</span> : <span className="text-danger small italic">Missing</span>)}
+                            </td>
+
+                            {/* Validation Status */}
+                            <td>
+                              {q.isValid ? (
+                                <span className="text-success small fw-semibold d-flex align-items-center gap-1">
+                                  <i className="bi bi-check-circle-fill"></i> Valid
+                                </span>
+                              ) : (
+                                <span className="text-danger small d-block" style={{ lineHeight: '1.2' }}>{q.error}</span>
                               )}
                             </td>
                           </tr>
@@ -221,12 +288,12 @@ export default function BatchQuestionsModal({
                 type="button"
                 className="btn gradient-btn btn-sm rounded-3 px-4 d-flex align-items-center gap-2"
                 onClick={handleSaveAll}
-                disabled={loading || parsedQuestions.length === 0}
+                disabled={loading || parsedQuestions.filter(q => q.isValid).length === 0}
               >
                 {loading && (
                   <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 )}
-                Save All {parsedQuestions.length > 0 ? `(${parsedQuestions.length})` : ''}
+                Save Valid ({parsedQuestions.filter(q => q.isValid).length})
               </button>
             </div>
           </div>

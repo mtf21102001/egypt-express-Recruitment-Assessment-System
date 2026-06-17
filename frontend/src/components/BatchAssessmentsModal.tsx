@@ -11,6 +11,7 @@ interface BatchAssessmentsModalProps {
 }
 
 interface ParsedAssessment {
+  rawCols: string[];
   jobId: string;
   jobTitle: string;
   title: string;
@@ -44,35 +45,52 @@ export default function BatchAssessmentsModal({
     const newAssessments: ParsedAssessment[] = [];
 
     for (let i = 0; i < rows.length; i++) {
-      const cols = rows[i].split('\t');
-      if (cols.length < 5) continue; // Job Title, Title, Description, Duration, Passing Score are required
+      const cols = rows[i].split('\t').map(c => c.trim());
+      const rawCols = [...cols];
 
-      const jobInput = cols[0].trim();
-      const title = cols[1].trim();
-      const description = cols[2].trim();
-      const duration = parseInt(cols[3].trim(), 10);
-      const passingScore = parseInt(cols[4].trim(), 10);
-      let status = (cols[5] || 'ACTIVE').trim().toUpperCase();
+      const jobInput = cols[0] || '';
+      const title = cols[1] || '';
+      const description = cols[2] || '';
+      const durationVal = cols[3] || '';
+      const passingScoreVal = cols[4] || '';
+      let status = (cols[5] || 'ACTIVE').toUpperCase();
       if (status !== 'ACTIVE' && status !== 'INACTIVE') {
         status = 'ACTIVE';
       }
+
+      const duration = parseInt(durationVal, 10);
+      const passingScore = parseInt(passingScoreVal, 10);
 
       // Find job by title or ID
       const matchedJob = jobs.find(
         (j) => j.title.toLowerCase() === jobInput.toLowerCase() || j.id === jobInput
       );
 
-      const isValid = !isNaN(duration) && !isNaN(passingScore) && !!matchedJob;
+      let isValid = true;
       let validationError = '';
-      if (!matchedJob) {
+
+      if (!jobInput) {
+        isValid = false;
+        validationError = 'Missing Job Title/ID (Col A).';
+      } else if (!matchedJob) {
+        isValid = false;
         validationError = `Job "${jobInput}" not found.`;
+      } else if (!title) {
+        isValid = false;
+        validationError = 'Missing Assessment Title (Col B).';
+      } else if (!description) {
+        isValid = false;
+        validationError = 'Missing Description (Col C).';
       } else if (isNaN(duration)) {
-        validationError = 'Duration must be a number.';
+        isValid = false;
+        validationError = 'Invalid Duration (Col D).';
       } else if (isNaN(passingScore)) {
-        validationError = 'Passing Score must be a number.';
+        isValid = false;
+        validationError = 'Invalid Passing Score (Col E).';
       }
 
       newAssessments.push({
+        rawCols,
         jobId: matchedJob ? matchedJob.id : '',
         jobTitle: matchedJob ? matchedJob.title : jobInput,
         title,
@@ -120,7 +138,7 @@ export default function BatchAssessmentsModal({
     <>
       <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
       <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
-        <div className="modal-dialog modal-dialog-centered modal-xl">
+        <div className="modal-dialog modal-dialog-centered modal-xl" style={{ maxWidth: '90%' }}>
           <div className="modal-content glass-card border-0 p-4 animate-slide-up" style={{ background: 'var(--card-bg)' }}>
             <div className="modal-header border-0 pb-0">
               <h5 className="modal-title fw-bold">Batch Import Assessments</h5>
@@ -147,7 +165,7 @@ export default function BatchAssessmentsModal({
                   <h6 className="fw-semibold">Paste Excel Columns Here</h6>
                   <p className="text-muted small mb-4">
                     Copy columns in Excel matching this format: <br />
-                    <code>[Job Title] | [Assessment Title] | [Description] | [Duration (Mins)] | [Passing Score (%)] | [Status (ACTIVE/INACTIVE)]</code>
+                    <code>[Col A: Job Title] | [Col B: Assessment Title] | [Col C: Description] | [Col D: Duration (Mins)] | [Col E: Passing Score (%)] | [Col F: Status]</code>
                   </p>
                   <textarea
                     className="form-control bg-light bg-opacity-5 text-main"
@@ -162,7 +180,7 @@ export default function BatchAssessmentsModal({
                 <div>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <span className="text-muted small">
-                      Parsed <strong>{parsedAssessments.length}</strong> assessments. (Only valid rows will be saved).
+                      Parsed <strong>{parsedAssessments.length}</strong> assessments. Only valid rows (marked in green) will be imported.
                     </span>
                     <button
                       className="btn btn-sm btn-outline-danger border-opacity-25"
@@ -173,27 +191,41 @@ export default function BatchAssessmentsModal({
                     </button>
                   </div>
 
-                  <div className="table-responsive" style={{ maxHeight: '350px' }}>
-                    <table className="table custom-table mb-0 align-middle small">
-                      <thead>
+                  <div className="table-responsive" style={{ maxHeight: '400px' }}>
+                    <table className="table table-bordered custom-table mb-0 align-middle small text-light" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                      <thead className="bg-dark bg-opacity-50">
                         <tr>
-                          <th>Target Job</th>
-                          <th>Assessment Title</th>
-                          <th>Description</th>
-                          <th>Duration</th>
-                          <th>Pass Score</th>
-                          <th>Status</th>
-                          <th>Validation</th>
+                          <th style={{ width: '50px' }}>#</th>
+                          <th>Col A: Target Job</th>
+                          <th>Col B: Assessment Title</th>
+                          <th>Col C: Description</th>
+                          <th style={{ width: '120px' }}>Col D: Duration</th>
+                          <th style={{ width: '120px' }}>Col E: Pass Score</th>
+                          <th style={{ width: '120px' }}>Col F: Status</th>
+                          <th style={{ width: '180px' }}>Validation Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {parsedAssessments.map((ass, idx) => (
-                          <tr key={idx} className={ass.isValid ? '' : 'table-danger bg-danger bg-opacity-10'}>
-                            <td className="fw-semibold text-main">{ass.jobTitle}</td>
-                            <td>{ass.title}</td>
-                            <td className="text-muted text-truncate" style={{ maxWidth: '180px' }}>{ass.description}</td>
-                            <td>{ass.duration} Mins</td>
-                            <td>{ass.passingScore}%</td>
+                          <tr key={idx} className={ass.isValid ? '' : 'table-danger bg-danger bg-opacity-5'}>
+                            <td className="font-monospace text-muted text-center">{idx + 1}</td>
+                            <td className={!ass.jobId ? 'bg-danger bg-opacity-10 text-danger' : ''}>
+                              {ass.jobTitle || <span className="text-danger small italic">Required</span>}
+                            </td>
+                            <td className={!ass.title ? 'bg-danger bg-opacity-10 text-danger' : ''}>
+                              {ass.title || <span className="text-danger small italic">Required</span>}
+                            </td>
+                            <td className={!ass.description ? 'bg-danger bg-opacity-10 text-danger' : ''}>
+                              <div className="text-truncate" style={{ maxWidth: '250px' }}>
+                                {ass.description || <span className="text-danger small italic">Required</span>}
+                              </div>
+                            </td>
+                            <td className={isNaN(ass.duration) || ass.rawCols[3] === '' ? 'bg-danger bg-opacity-10 text-danger text-center' : 'text-center'}>
+                              {ass.rawCols[3] ? `${ass.duration} Mins` : <span className="text-danger small italic">Required</span>}
+                            </td>
+                            <td className={isNaN(ass.passingScore) || ass.rawCols[4] === '' ? 'bg-danger bg-opacity-10 text-danger text-center' : 'text-center'}>
+                              {ass.rawCols[4] ? `${ass.passingScore}%` : <span className="text-danger small italic">Required</span>}
+                            </td>
                             <td>
                               <span className={`badge bg-${ass.status === 'ACTIVE' ? 'success' : 'secondary'} bg-opacity-10 text-${ass.status === 'ACTIVE' ? 'success' : 'secondary'}`}>
                                 {ass.status}
@@ -201,9 +233,11 @@ export default function BatchAssessmentsModal({
                             </td>
                             <td>
                               {ass.isValid ? (
-                                <span className="text-success fw-semibold"><i className="bi bi-check-circle me-1"></i>Valid</span>
+                                <span className="text-success small fw-semibold d-flex align-items-center gap-1">
+                                  <i className="bi bi-check-circle-fill"></i> Valid
+                                </span>
                               ) : (
-                                <span className="text-danger small">{ass.validationError}</span>
+                                <span className="text-danger small d-block" style={{ lineHeight: '1.2' }}>{ass.validationError}</span>
                               )}
                             </td>
                           </tr>

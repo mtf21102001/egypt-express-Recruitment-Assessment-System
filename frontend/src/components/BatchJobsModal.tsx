@@ -10,9 +10,12 @@ interface BatchJobsModalProps {
 }
 
 interface ParsedJob {
+  rawCols: string[];
   title: string;
   description: string;
   status: string;
+  isValid: boolean;
+  error?: string;
 }
 
 export default function BatchJobsModal({
@@ -36,29 +39,48 @@ export default function BatchJobsModal({
     const newJobs: ParsedJob[] = [];
 
     for (let i = 0; i < rows.length; i++) {
-      const cols = rows[i].split('\t');
-      if (cols.length < 2) continue; // Title and description are required
+      const cols = rows[i].split('\t').map(c => c.trim());
+      const rawCols = [...cols];
 
-      const title = cols[0].trim();
-      const description = cols[1].trim();
-      let status = (cols[2] || 'ACTIVE').trim().toUpperCase();
+      const title = cols[0] || '';
+      const description = cols[1] || '';
+      let status = (cols[2] || 'ACTIVE').toUpperCase();
       if (status !== 'ACTIVE' && status !== 'INACTIVE') {
         status = 'ACTIVE';
       }
 
-      newJobs.push({ title, description, status });
+      let isValid = true;
+      let valError = '';
+
+      if (!title) {
+        isValid = false;
+        valError = 'Missing Job Title (Col A).';
+      } else if (!description) {
+        isValid = false;
+        valError = 'Missing Job Description (Col B).';
+      }
+
+      newJobs.push({
+        rawCols,
+        title,
+        description,
+        status,
+        isValid,
+        error: valError,
+      });
     }
 
     setParsedJobs(newJobs);
   };
 
   const handleSaveAll = async () => {
-    if (parsedJobs.length === 0) return;
+    const validJobs = parsedJobs.filter((j) => j.isValid);
+    if (validJobs.length === 0) return;
     setLoading(true);
     setError('');
 
     try {
-      for (const job of parsedJobs) {
+      for (const job of validJobs) {
         await api.jobs.create({
           title: job.title,
           description: job.description,
@@ -80,7 +102,7 @@ export default function BatchJobsModal({
     <>
       <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
       <div className="modal fade show d-block" tabIndex={-1} style={{ zIndex: 1050 }}>
-        <div className="modal-dialog modal-dialog-centered modal-lg">
+        <div className="modal-dialog modal-dialog-centered modal-xl" style={{ maxWidth: '90%' }}>
           <div className="modal-content glass-card border-0 p-4 animate-slide-up" style={{ background: 'var(--card-bg)' }}>
             <div className="modal-header border-0 pb-0">
               <h5 className="modal-title fw-bold">Batch Import Jobs</h5>
@@ -107,7 +129,7 @@ export default function BatchJobsModal({
                   <h6 className="fw-semibold">Paste Excel Columns Here</h6>
                   <p className="text-muted small mb-4">
                     Copy columns in Excel matching this format: <br />
-                    <code>[Job Title] | [Description] | [Status (ACTIVE/INACTIVE)]</code>
+                    <code>[Col A: Job Title] | [Col B: Job Description] | [Col C: Status (ACTIVE/INACTIVE)]</code>
                   </p>
                   <textarea
                     className="form-control bg-light bg-opacity-5 text-main"
@@ -122,7 +144,7 @@ export default function BatchJobsModal({
                 <div>
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <span className="text-muted small">
-                      Parsed <strong>{parsedJobs.length}</strong> jobs. Verify below before saving.
+                      Parsed <strong>{parsedJobs.length}</strong> jobs. Only valid rows (marked in green) will be imported.
                     </span>
                     <button
                       className="btn btn-sm btn-outline-danger border-opacity-25"
@@ -133,24 +155,42 @@ export default function BatchJobsModal({
                     </button>
                   </div>
 
-                  <div className="table-responsive" style={{ maxHeight: '300px' }}>
-                    <table className="table custom-table mb-0 align-middle small">
-                      <thead>
+                  <div className="table-responsive" style={{ maxHeight: '400px' }}>
+                    <table className="table table-bordered custom-table mb-0 align-middle small text-light" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                      <thead className="bg-dark bg-opacity-50">
                         <tr>
-                          <th>Job Title</th>
-                          <th>Description</th>
-                          <th>Status</th>
+                          <th style={{ width: '50px' }}>#</th>
+                          <th>Col A: Job Title</th>
+                          <th>Col B: Job Description</th>
+                          <th style={{ width: '150px' }}>Col C: Status</th>
+                          <th style={{ width: '180px' }}>Validation Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {parsedJobs.map((job, idx) => (
-                          <tr key={idx}>
-                            <td className="fw-semibold text-main">{job.title}</td>
-                            <td className="text-muted text-truncate" style={{ maxWidth: '250px' }}>{job.description}</td>
+                          <tr key={idx} className={job.isValid ? '' : 'table-danger bg-danger bg-opacity-5'}>
+                            <td className="font-monospace text-muted text-center">{idx + 1}</td>
+                            <td className={!job.title ? 'bg-danger bg-opacity-10 text-danger' : ''}>
+                              {job.title || <span className="text-danger small italic">Required</span>}
+                            </td>
+                            <td className={!job.description ? 'bg-danger bg-opacity-10 text-danger' : ''}>
+                              <div className="text-truncate" style={{ maxWidth: '350px' }}>
+                                {job.description || <span className="text-danger small italic">Required</span>}
+                              </div>
+                            </td>
                             <td>
                               <span className={`badge bg-${job.status === 'ACTIVE' ? 'success' : 'secondary'} bg-opacity-10 text-${job.status === 'ACTIVE' ? 'success' : 'secondary'}`}>
                                 {job.status}
                               </span>
+                            </td>
+                            <td>
+                              {job.isValid ? (
+                                <span className="text-success small fw-semibold d-flex align-items-center gap-1">
+                                  <i className="bi bi-check-circle-fill"></i> Valid
+                                </span>
+                              ) : (
+                                <span className="text-danger small d-block" style={{ lineHeight: '1.2' }}>{job.error}</span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -174,12 +214,12 @@ export default function BatchJobsModal({
                 type="button"
                 className="btn gradient-btn btn-sm rounded-3 px-4 d-flex align-items-center gap-2"
                 onClick={handleSaveAll}
-                disabled={loading || parsedJobs.length === 0}
+                disabled={loading || parsedJobs.filter(j => j.isValid).length === 0}
               >
                 {loading && (
                   <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                 )}
-                Save All {parsedJobs.length > 0 ? `(${parsedJobs.length})` : ''}
+                Save Valid ({parsedJobs.filter(j => j.isValid).length})
               </button>
             </div>
           </div>
