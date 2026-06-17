@@ -15,6 +15,16 @@ interface SavedAnswer {
   textAnswer?: string;
 }
 
+// Helper function to shuffle arrays for randomization
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
 export default function ActiveExamPage({ params }: PageProps) {
   const router = useRouter();
   const [attemptId, setAttemptId] = useState<string | null>(null);
@@ -33,6 +43,15 @@ export default function ActiveExamPage({ params }: PageProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // Anti-cheating state and refs
+  const [cheatWarnings, setCheatWarnings] = useState(0);
+  const [showCheatModal, setShowCheatModal] = useState(false);
+  const isWarningModalOpenRef = useRef(false);
+
+  useEffect(() => {
+    isWarningModalOpenRef.current = showCheatModal;
+  }, [showCheatModal]);
+
   // Refs for tracking timer
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -43,7 +62,7 @@ export default function ActiveExamPage({ params }: PageProps) {
     }
   };
 
-  const triggerAutoSubmit = useCallback(async () => {
+  const triggerAutoSubmit = useCallback(async (reason?: string) => {
     if (!attemptId) return;
     setSubmitting(true);
     try {
@@ -56,10 +75,18 @@ export default function ActiveExamPage({ params }: PageProps) {
       
       // Navigate to success scorecard screen
       sessionStorage.setItem(`result_${attemptId}`, JSON.stringify(res));
+      
+      if (reason === 'cheat') {
+        alert("Exam submitted: Cheating behavior detected (switching windows/tabs).");
+      }
+      
       router.push(`/assessments/attempt/${attemptId}/result`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      alert('Time expired! Your assessment was force-submitted but encountered an error: ' + message);
+      const defaultAlert = reason === 'cheat'
+        ? 'Cheating detected! Your assessment was force-submitted but encountered an error: '
+        : 'Time expired! Your assessment was force-submitted but encountered an error: ';
+      alert(defaultAlert + message);
       router.push('/');
     }
   }, [attemptId, answers, router]);
@@ -84,7 +111,23 @@ export default function ActiveExamPage({ params }: PageProps) {
       try {
         const parsed = JSON.parse(savedDataStr);
         setExamTitle(parsed.assessment?.title || 'Assessment');
-        setQuestions(parsed.questions || []);
+        
+        // Randomize questions and options if not already done
+        let loadedQuestions: Question[] = parsed.questions || [];
+        if (!parsed.isRandomized && loadedQuestions.length > 0) {
+          loadedQuestions = shuffleArray(loadedQuestions).map((q) => {
+            if (q.options && q.options.length > 0) {
+              return { ...q, options: shuffleArray(q.options) };
+            }
+            return q;
+          });
+          // Save the randomized state back to avoid reshuffling on page reload
+          parsed.questions = loadedQuestions;
+          parsed.isRandomized = true;
+          localStorage.setItem(`attempt_data_${attemptId}`, JSON.stringify(parsed));
+        }
+        
+        setQuestions(loadedQuestions);
         setStartedAt(parsed.startedAt);
         setDurationMinutes(parsed.assessment?.duration || 30);
 
@@ -129,6 +172,58 @@ export default function ActiveExamPage({ params }: PageProps) {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [loading, startedAt, durationMinutes, attemptId, error, triggerAutoSubmit]);
+
+  // Anti-cheating listeners (tab-switching, window blur, context menu, copy/paste)
+  useEffect(() => {
+    if (loading || submitting || !attemptId) return;
+
+    const handleCheatingDetected = () => {
+      if (isWarningModalOpenRef.current || submitting || loading) return;
+
+      setCheatWarnings((prev) => {
+        const next = prev + 1;
+        if (next >= 2) {
+          triggerAutoSubmit('cheat');
+        } else {
+          setShowCheatModal(true);
+        }
+        return next;
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleCheatingDetected();
+      }
+    };
+
+    const handleBlur = () => {
+      handleCheatingDetected();
+    };
+
+    const preventCopyPaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+      alert("Copying and pasting is disabled during the assessment.");
+    };
+
+    const preventRightClick = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('copy', preventCopyPaste);
+    document.addEventListener('paste', preventCopyPaste);
+    document.addEventListener('contextmenu', preventRightClick);
+
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('copy', preventCopyPaste);
+      document.removeEventListener('paste', preventCopyPaste);
+      document.removeEventListener('contextmenu', preventRightClick);
+    };
+  }, [loading, submitting, attemptId, triggerAutoSubmit]);
 
   const handleSelectRadio = (questionId: string, optionId: string) => {
     const updated = {
@@ -447,6 +542,27 @@ export default function ActiveExamPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+      {/* Cheat Warning Modal Overlay */}
+      {showCheatModal && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-75" style={{ zIndex: 9999 }}>
+          <div className="glass-card p-5 text-center col-11 col-md-6 border-warning border-opacity-25" style={{ background: 'rgba(25, 25, 35, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 193, 7, 0.2)' }}>
+            <div className="d-inline-flex align-items-center justify-content-center bg-warning bg-opacity-10 text-warning rounded-circle mb-4" style={{ width: '72px', height: '72px' }}>
+              <i className="bi bi-exclamation-triangle fs-1"></i>
+            </div>
+            <h3 className="fw-bold mb-2 text-warning">Warning: Tab Switch Detected</h3>
+            <p className="text-muted small mb-4">
+              You left the exam screen. This event has been logged.
+              Leaving the screen again will cause your assessment to be submitted immediately.
+            </p>
+            <button 
+              className="btn btn-warning fw-bold px-4 rounded-pill"
+              onClick={() => setShowCheatModal(false)}
+            >
+              I Understand, Continue Exam
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
