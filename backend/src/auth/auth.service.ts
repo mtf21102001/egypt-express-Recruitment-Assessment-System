@@ -32,7 +32,7 @@ export class AuthService {
         name: createUserDto.name,
         email: createUserDto.email,
         password: hashedPassword,
-        role: 'HR', // Default role for users registered this way
+        role: createUserDto.role || 'HR', // Default to HR if not provided
       },
     });
 
