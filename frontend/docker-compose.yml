@@ -4,7 +4,7 @@ services:
     build:
       context: .
       args:
-        NEXT_PUBLIC_API_URL: https://surprising-eagles-clouds-detector.trycloudflare.com
+        NEXT_PUBLIC_API_URL: https://integrating-newark-pale-provisions.trycloudflare.com
     container_name: recruitment_frontend
     restart: always
     ports:
